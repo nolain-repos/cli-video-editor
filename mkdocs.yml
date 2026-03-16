@@ -73,6 +73,7 @@ nav:
 - Setups:
   - Overview: setups/index.md
 - Functionality:
+  - Overview: functionality/index.md
   - Run: functionality/run.md
   - Veditor: functionality/veditor.md
 - API:
