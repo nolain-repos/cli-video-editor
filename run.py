@@ -10,6 +10,12 @@ ACTIONS = ["Zoom", "Mute", "Spatial Crop", "Time Crop"]
 
 
 def read_key():
+    """Reads a single key from stdin in raw mode, supporting arrows and enter.
+
+    Returns:
+        str: One of "up", "down", "enter", "escape", or the literal character.
+        May raise KeyboardInterrupt on Ctrl+C.
+    """
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
@@ -34,11 +40,22 @@ def read_key():
 
 
 def clear_screen():
+    """Clears the terminal and moves the cursor to the home position."""
     sys.stdout.write("\033[2J\033[H")
     sys.stdout.flush()
 
 
 def show_menu(title, options, header=""):
+    """Displays a navigable menu and returns the index of the selected option.
+
+    Args:
+        title (str): Menu title shown at the top.
+        options (list[str]): List of option labels.
+        header (str, optional): Optional text shown above the title. Defaults to "".
+
+    Returns:
+        int: Index of the selected option (0-based).
+    """
     selected = 0
     while True:
         clear_screen()
@@ -62,6 +79,17 @@ def show_menu(title, options, header=""):
 
 
 def get_input(prompt, type_fn=float, optional=False):
+    """Reads a line from stdin and parses it with the given type.
+
+    Args:
+        prompt (str): Prompt to display before input.
+        type_fn (callable, optional): Function to convert input (e.g. float, int).
+            Defaults to float.
+        optional (bool, optional): If True, empty input returns None. Defaults to False.
+
+    Returns:
+        Parsed value (type depends on type_fn), or None if optional and input is empty.
+    """
     while True:
         raw = input(prompt)
         if optional and raw.strip() == "":
@@ -73,7 +101,19 @@ def get_input(prompt, type_fn=float, optional=False):
 
 
 def get_path_input(prompt, validate=None):
-    """Read a file path character by character, validating directories on each '/'."""
+    """Reads a file path character by character with Tab autocomplete.
+
+    Validates directories on each '/' and supports backspace. Raw terminal mode
+    is used for single-key reading.
+
+    Args:
+        prompt (str): Prompt to display before input.
+        validate (callable, optional): Function(path) -> error_string. If provided,
+            return is only accepted when it returns empty string. Defaults to None.
+
+    Returns:
+        str: The entered path. May raise KeyboardInterrupt on Ctrl+C.
+    """
     sys.stdout.write(prompt)
     sys.stdout.flush()
 
@@ -194,6 +234,14 @@ def get_path_input(prompt, validate=None):
 
 
 def format_action(action):
+    """Formats a single (name, params) action for display.
+
+    Args:
+        action (tuple): Pair of (action_name, params_dict), e.g. ("zoom", {...}).
+
+    Returns:
+        str: Human-readable label, e.g. "Zoom(tstart=1.0, tend=2.0)".
+    """
     name, params = action
     parts = ", ".join(f"{k}={v}" for k, v in params.items() if v is not None)
     labels = {
@@ -206,6 +254,14 @@ def format_action(action):
 
 
 def build_header(actions):
+    """Builds the "Queued actions" header text for the menu.
+
+    Args:
+        actions (list): List of (name, params) action tuples.
+
+    Returns:
+        str: Formatted header string, including newlines.
+    """
     if not actions:
         return "  \033[2mNo actions queued yet.\033[0m\n"
     lines = ["  \033[1mQueued actions:\033[0m"]
@@ -216,6 +272,11 @@ def build_header(actions):
 
 
 def configure_zoom():
+    """Prompts for zoom parameters and returns the action tuple.
+
+    Returns:
+        tuple: ("zoom", {"tstart", "tend", "w", "h", "zoom_factor"}).
+    """
     clear_screen()
     print("  \033[1mConfigure Zoom\033[0m\n")
     tstart = get_input("  Start time (s): ")
@@ -230,6 +291,11 @@ def configure_zoom():
 
 
 def configure_mute():
+    """Prompts for mute time range; empty values mean full video.
+
+    Returns:
+        tuple: ("mute", {"tstart", "tend"}); tstart/tend may be None.
+    """
     clear_screen()
     print("  \033[1mConfigure Mute\033[0m\n")
     print("  \033[2mLeave empty for video start/end.\033[0m\n")
@@ -239,6 +305,11 @@ def configure_mute():
 
 
 def configure_spatial_crop():
+    """Prompts for pixel boundaries and returns the spatial crop action.
+
+    Returns:
+        tuple: ("spatial_crop", {"x1", "y1", "x2", "y2"}).
+    """
     clear_screen()
     print("  \033[1mConfigure Spatial Crop\033[0m\n")
     x1 = get_input("  Left boundary (px): ", int)
@@ -249,6 +320,11 @@ def configure_spatial_crop():
 
 
 def configure_time_crop():
+    """Prompts for start/end times and returns the time crop action.
+
+    Returns:
+        tuple: ("time_crop", {"tstart", "tend"}).
+    """
     clear_screen()
     print("  \033[1mConfigure Time Crop\033[0m\n")
     tstart = get_input("  Start time (s): ")
@@ -260,6 +336,14 @@ CONFIGURATORS = [configure_zoom, configure_mute, configure_spatial_crop, configu
 
 
 def action_pool_menu(actions):
+    """Shows the "Add Action" menu and runs the chosen configurator.
+
+    Args:
+        actions (list): Current list of queued (name, params) actions (for header).
+
+    Returns:
+        tuple or None: New ("action_name", params) tuple, or None if user chose Back.
+    """
     options = ACTIONS + ["← Back"]
     header = build_header(actions)
     idx = show_menu("Add Action", options, header=header)
@@ -269,6 +353,13 @@ def action_pool_menu(actions):
 
 
 def apply_actions(actions, input_video, output_video):
+    """Builds a VideoEditor from the action list and runs it to produce the output.
+
+    Args:
+        actions (list): List of ("action_name", params) tuples.
+        input_video (str): Path to the source video.
+        output_video (str): Path for the processed video.
+    """
     editor = VideoEditor()
     for name, params in actions:
         if name == "zoom":
@@ -286,6 +377,16 @@ def apply_actions(actions, input_video, output_video):
 
 
 def resolve_input_path(path):
+    """Resolves a possibly extension-less path to a full input path.
+
+    Appends .mp4 if no extension; if no directory, uses current working directory.
+
+    Args:
+        path (str): User-provided input path.
+
+    Returns:
+        str: Resolved absolute or cwd-relative path.
+    """
     if not os.path.splitext(path)[1]:
         path += ".mp4"
     if not os.path.dirname(path):
@@ -294,6 +395,17 @@ def resolve_input_path(path):
 
 
 def resolve_output_path(path, input_path):
+    """Resolves a possibly extension-less output path relative to input location.
+
+    Appends .mp4 if no extension; if no directory, uses the input file's directory.
+
+    Args:
+        path (str): User-provided output path.
+        input_path (str): Path of the input video (used for default directory).
+
+    Returns:
+        str: Resolved output path.
+    """
     if not os.path.splitext(path)[1]:
         path += ".mp4"
     if not os.path.dirname(path):
@@ -303,6 +415,7 @@ def resolve_output_path(path, input_path):
 
 
 def main():
+    """Entry point: prompts for input/output paths, queues actions, and runs the editor."""
     clear_screen()
     print("  \033[1m=== CLI Video Editor ===\033[0m\n")
 

@@ -14,6 +14,7 @@ class VideoEditor:
     """
 
     def __init__(self):
+        """Initializes the VideoEditor with empty zoom, crop, mute, and spatial crop lists."""
         self.zooms = []
         self.crops = []
         self.spatial_crop = None
@@ -75,6 +76,18 @@ class VideoEditor:
         self.mutes.append((tstart, tend))
 
     def _apply_mutes(self, video):
+        """Applies all queued mute ranges to the video's audio track.
+
+        Merges overlapping mute ranges and builds a new audio clip from
+        silent and original segments.
+
+        Args:
+            video (VideoClip): The video clip whose audio will be muted.
+
+        Returns:
+            VideoClip: The same video with audio muted in the specified ranges.
+                If the entire duration is muted, returns video without audio.
+        """
         audio = video.audio
         if audio is None:
             return video
@@ -131,8 +144,13 @@ class VideoEditor:
         return video.with_audio(new_audio)
 
     def run(self, input_path, output_path):
-        """
-        Processes the input video by applying all queued zoom and crop operations.
+        """Processes the input video by applying all queued operations and writes the result.
+
+        Order of operations: zooms, spatial crop, mutes, time crops, then export.
+
+        Args:
+            input_path (str): Path to the source video file.
+            output_path (str): Path where the processed video will be written.
         """
         video = VideoFileClip(input_path)
         original_w, original_h = video.size
