@@ -1,0 +1,80 @@
+site_name: cli-video-editor
+theme:
+  icon:
+    admonition:
+      example: simple/libreofficemath
+  name: material
+  features:
+  - navigation.tabs
+  - navigation.sections
+  - navigation.expand
+  - navigation.path
+  - content.footnote.tooltips
+  - content.code.copy
+  - content.code.select
+  - content.code.annotate
+  language: en
+  palette:
+  - scheme: default
+    primary: indigo
+    toggle:
+      icon: material/lightbulb
+      name: Switch to dark mode
+  - scheme: slate
+    primary: lime
+    toggle:
+      icon: material/lightbulb-outline
+      name: Switch to light mode
+markdown_extensions:
+- def_list
+- footnotes
+- pymdownx.critic
+- pymdownx.caret
+- pymdownx.keys
+- pymdownx.mark
+- pymdownx.tilde
+- pymdownx.highlight:
+    anchor_linenums: true
+    line_spans: __span
+    pygments_lang_class: true
+- pymdownx.inlinehilite
+- pymdownx.snippets
+- pymdownx.superfences
+- admonition
+- pymdownx.details
+- pymdownx.superfences
+- attr_list
+- pymdownx.emoji
+- pymdownx.tasklist:
+    custom_checkbox: true
+- md_in_html
+- pymdownx.arithmatex:
+    generic: true
+extra:
+  annotate:
+    json:
+    - .s2
+plugins:
+- search
+- mkdocstrings
+- glightbox
+- mkdocs-jupyter
+extra_css:
+- stylesheets/extra.css
+- https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.css
+extra_javascript:
+- javascripts/katex.js
+- https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/katex.min.js
+- https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.7/contrib/auto-render.min.js
+nav:
+- Home: README.md
+- Quickstart:
+  - Overview: quickstart/index.md
+- Setups:
+  - Overview: setups/index.md
+- Functionality:
+  - Run: functionality/run.md
+  - Veditor: functionality/veditor.md
+- API:
+  - Veditor: api/veditor.md
+  - Run: api/run.md

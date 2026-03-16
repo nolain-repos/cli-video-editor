@@ -1,23 +1,23 @@
-from moviepy import VideoFileClip, concatenate_videoclips, vfx
+from moviepy import VideoFileClip, concatenate_videoclips, concatenate_audioclips, AudioArrayClip, vfx
 from PIL import Image
 import numpy as np
 
 class VideoEditor:
     """
-    A class to manage and apply video editing operations such as gradual zoom-in/out 
-    and temporal cropping (trimming) using MoviePy.
-    
-    The editor follows a specific order of operations:
+    A class to manage and apply video editing operations using MoviePy.
+
+    Order of operations applied in run():
     1. Apply all zoom transformations to the original video.
-    2. Extract and concatenate specific temporal segments (crops) from the zoomed video.
+    2. Apply spatial crop (frame region).
+    3. Apply mute ranges to the audio track.
+    4. Extract and concatenate specific temporal segments (time crops).
     """
 
     def __init__(self):
-        """
-        Initializes the VideoEditor with empty lists for zoom and crop operations.
-        """
         self.zooms = []
         self.crops = []
+        self.spatial_crop = None
+        self.mutes = []
 
     def add_zoom(self, tstart, tend, w, h, zoom_factor):
         """
@@ -39,15 +39,96 @@ class VideoEditor:
             'zoom_factor': zoom_factor
         })
 
-    def add_crop(self, tstart, tend):
+    def add_time_crop(self, tstart, tend):
         """
         Adds a temporal cropping operation (segment to keep).
-        
+
         Args:
             tstart (float): The start time (in seconds) of the segment to keep.
             tend (float): The end time (in seconds) of the segment to keep.
         """
         self.crops.append((tstart, tend))
+
+    def add_spatial_crop(self, x1, y1, x2, y2):
+        """
+        Crops the video frame to the given pixel rectangle. Subsequent calls
+        override the previous one (only one spatial crop is applied).
+
+        Args:
+            x1 (int): Left boundary in pixels.
+            y1 (int): Top boundary in pixels.
+            x2 (int): Right boundary in pixels.
+            y2 (int): Bottom boundary in pixels.
+        """
+        self.spatial_crop = (x1, y1, x2, y2)
+
+    def add_mute(self, tstart=None, tend=None):
+        """
+        Mutes the audio for a time range. Times refer to the original video
+        timeline (before time crops). Calling with no arguments mutes the
+        entire video.
+
+        Args:
+            tstart (float, optional): Start time in seconds. Defaults to 0.
+            tend (float, optional): End time in seconds. Defaults to video end.
+        """
+        self.mutes.append((tstart, tend))
+
+    def _apply_mutes(self, video):
+        audio = video.audio
+        if audio is None:
+            return video
+
+        duration = video.duration
+
+        mute_ranges = []
+        for tstart, tend in self.mutes:
+            t1 = float(tstart) if tstart is not None else 0.0
+            t2 = float(tend) if tend is not None else duration
+            t1 = max(0.0, min(t1, duration))
+            t2 = max(0.0, min(t2, duration))
+            if t1 < t2:
+                mute_ranges.append([t1, t2])
+
+        if not mute_ranges:
+            return video
+
+        mute_ranges.sort()
+        merged = [mute_ranges[0]]
+        for start, end in mute_ranges[1:]:
+            if start <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], end)
+            else:
+                merged.append([start, end])
+
+        if merged[0][0] <= 0.0 and merged[-1][1] >= duration:
+            return video.without_audio()
+
+        audio_fps = audio.fps
+        nchannels = audio.nchannels if hasattr(audio, 'nchannels') else 2
+
+        events = []
+        prev = 0.0
+        for t1, t2 in merged:
+            if prev < t1:
+                events.append((prev, t1, False))
+            events.append((t1, t2, True))
+            prev = t2
+        if prev < duration:
+            events.append((prev, duration, False))
+
+        audio_segments = []
+        for t1, t2, is_muted in events:
+            seg_duration = t2 - t1
+            if is_muted:
+                n_samples = int(round(seg_duration * audio_fps))
+                silence = np.zeros((n_samples, nchannels))
+                audio_segments.append(AudioArrayClip(silence, fps=audio_fps))
+            else:
+                audio_segments.append(audio.subclipped(t1, t2))
+
+        new_audio = concatenate_audioclips(audio_segments)
+        return video.with_audio(new_audio)
 
     def run(self, input_path, output_path):
         """
@@ -85,7 +166,7 @@ class VideoEditor:
                 duration = z_end - z_start
                 midpoint = duration / 2
 
-                def gradual_zoom_filter(get_frame, t, t1=t1, z_start=z_start, midpoint=midpoint, z_peak_factor=z_peak_factor, z_w=z_w, z_h=z_h):
+                def gradual_zoom_filter(get_frame, t, t1=t1, z_start=z_start, duration=duration, z_peak_factor=z_peak_factor, z_w=z_w, z_h=z_h):
                     # t is relative to the segment start
                     t_abs = t1 + t
                     t_rel_zoom = t_abs - z_start
@@ -145,8 +226,17 @@ class VideoEditor:
             segments.append(seg)
         
         zoomed_video = concatenate_videoclips(segments)
-        
-        # 2. Apply Crops (Temporal)
+
+        # 2. Apply Spatial Crop
+        if self.spatial_crop:
+            x1, y1, x2, y2 = self.spatial_crop
+            zoomed_video = zoomed_video.with_effects([vfx.Crop(x1=x1, y1=y1, x2=x2, y2=y2)])
+
+        # 3. Apply Mutes
+        if self.mutes:
+            zoomed_video = self._apply_mutes(zoomed_video)
+
+        # 4. Apply Crops (Temporal) — always last
         if self.crops:
             final_segments = []
             for tstart, tend in self.crops:
@@ -154,15 +244,15 @@ class VideoEditor:
                 te = min(tend, zoomed_video.duration)
                 if ts < te:
                     final_segments.append(zoomed_video.subclipped(ts, te))
-            
+
             if final_segments:
                 final_video = concatenate_videoclips(final_segments)
             else:
                 final_video = zoomed_video
         else:
             final_video = zoomed_video
-            
-        # 3. Export
+
+        # 5. Export
         final_video.write_videofile(output_path, codec="libx264")
         video.close()
         final_video.close()
