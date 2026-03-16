@@ -10,9 +10,9 @@ The project features an interactive terminal-based interface that allows users t
 
 Explore the following sections to get started with the Video Editor project:
 
-- [Quickstart](docs/quickstart/index.md): Getting Started quickly with the project.
-- [Setups](docs/setups/index.md): Installation and configuration guide.
-- [Functionality](docs/functionality/index.md): Core features and functionality overview.
+- [Quickstart](quickstart/index.md): Getting Started quickly with the project.
+- [Setups](setups/index.md): Installation and configuration guide.
+- [Functionality](functionality/index.md): Core features and functionality overview.
 
 ## Contributing
 

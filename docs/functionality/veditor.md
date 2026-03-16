@@ -2,74 +2,74 @@
 
 ## Overview
 
-The `veditor.py` module provides a high-level interface for performing complex video editing operations using the MoviePy library. It encapsulates common video editing tasks into a reusable `VideoEditor` class, enabling users to apply multiple transformations in a controlled sequence without manually managing intermediate video clips.
+The `veditor.py` module provides a high-level interface for performing complex video editing operations using the MoviePy library. It encapsulates common video manipulation tasks into a reusable `VideoEditor` class, enabling users to apply multiple transformations in a controlled sequence without directly managing low-level video processing details.
 
 ## Core Features
 
 ### Multi-Stage Video Processing Pipeline
-The module implements a structured editing pipeline that applies transformations in a specific, optimized order:
-1. **Zoom effects** (applied first to the original footage)
-2. **Spatial cropping** (frame region selection)
-3. **Audio muting** (silencing specific time ranges)
-4. **Temporal cropping** (extracting and concatenating time segments)
 
-This ordering ensures that computationally intensive operations (like zooms) are performed on the highest-quality source material before any quality-reducing transformations.
+The module implements a structured editing pipeline that applies transformations in a specific, optimized order:
+1. **Zoom transformations** - Dynamic scaling effects applied to the original footage
+2. **Spatial cropping** - Frame region selection (fixed or normalized coordinates)
+3. **Audio muting** - Selective audio track silencing
+4. **Temporal segmentation** - Time-based clip extraction and concatenation
+
+This ordered approach ensures predictable results and prevents transformation conflicts.
 
 ### Zoom Effects
-- **Gradual zoom implementation**: Creates smooth zoom-in/zoom-out effects between specified time ranges
-- **Smoothstep interpolation**: Uses a mathematical smoothstep function to ensure natural acceleration/deceleration of zoom transitions
-- **Customizable focal points**: Allows specification of zoom center coordinates as relative positions (0.0-1.0) within the frame
-- **Multiple zoom support**: Can apply several independent zoom effects to different time segments
 
-### Cropping Operations
-- **Temporal cropping**: Extracts and concatenates specific time segments from the video
-- **Spatial cropping**: Defines rectangular regions of interest within the video frame
-- **Normalized coordinates**: Supports both absolute pixel values and relative (0.0-1.0) coordinates for spatial cropping
+The editor supports sophisticated zoom operations with:
+- **Gradual magnification** - Smooth transitions between zoom levels
+- **Custom focal points** - Precise control over zoom center coordinates
+- **Smoothstep interpolation** - Natural acceleration/deceleration of zoom speed
+- **Multiple zoom sequences** - Ability to stack several zoom effects
 
-### Audio Processing
-- **Precise muting**: Silences specific time ranges while preserving audio in other segments
-- **Multiple mute ranges**: Can apply several independent mute operations to different time segments
+Zoom parameters are specified in relative coordinates (0.0-1.0 range) for resolution independence.
 
-## Input Requirements
+### Temporal Editing
 
-### Video Source
-- Accepts any video format supported by MoviePy's `VideoFileClip`
-- Maintains original video quality until final export
+The module provides two distinct temporal editing capabilities:
+1. **Time cropping** - Extracting specific time segments from the source video
+2. **Audio muting** - Silencing portions of the audio track while preserving video
 
-### Transformation Parameters
-- **Time values**: All temporal parameters (start/end times) specified in seconds as floating-point numbers
-- **Spatial coordinates**: Relative positions (0.0-1.0) for zoom centers and spatial crops
-- **Zoom factors**: Magnification values (typically >1.0 for zoom-in effects)
-- **Crop dimensions**: Either absolute pixel values or normalized coordinates
+These operations maintain frame-perfect synchronization between audio and video streams.
 
-## Output Characteristics
+### Spatial Manipulation
 
-### Processed Video
-- Returns a single concatenated video clip with all transformations applied
-- Maintains original video's resolution unless modified by spatial cropping
-- Preserves original frame rate unless altered by temporal operations
+The editor supports:
+- **Fixed-coordinate cropping** - Pixel-based frame region selection
+- **Normalized cropping** - Resolution-independent frame region specification
+- **Non-destructive operations** - All transformations are applied to the original source
 
-### Audio Track
-- Combines original audio with mute operations applied
-- Maintains synchronization with video throughout all transformations
+## Technical Implementation
 
-## Technical Implementation Details
+### Input Requirements
 
-### Algorithm Design
-- **Non-destructive editing**: All operations are recorded as instructions and applied during final processing
-- **Lazy evaluation**: Transformations are only computed when the final video is generated
-- **Memory efficiency**: Processes video in segments where possible to minimize memory usage
+The module accepts:
+- **Video files** - Any format supported by MoviePy/FFmpeg
+- **Transformation parameters** - Time values in seconds, spatial coordinates in relative or absolute units
+- **Effect specifications** - Zoom factors, crop dimensions, mute ranges
 
-### Performance Considerations
-- Optimized operation ordering to minimize computational overhead
-- Batch processing of similar operations (e.g., multiple zooms applied in sequence)
-- Efficient handling of large video files through MoviePy's underlying implementation
+### Processing Algorithms
+
+The editor employs:
+- **Smoothstep interpolation** for natural zoom transitions
+- **Frame-accurate concatenation** for temporal segmentation
+- **Non-linear audio processing** for precise muting
+- **Resolution-independent coordinate systems** for spatial operations
+
+### Output Characteristics
+
+The module produces:
+- **Edited video files** - Maintaining original quality and format
+- **Synchronized audio/video streams** - With frame-perfect alignment
+- **Consistent aspect ratios** - Regardless of applied transformations
 
 ## Use Cases
 
-The module is particularly well-suited for:
-- Creating professional video presentations with dynamic zoom effects
-- Extracting highlights from longer videos
-- Preparing video content for social media with specific aspect ratio requirements
-- Creating video tutorials with focused attention on specific screen regions
-- Processing surveillance footage to highlight important events
+The module is particularly suited for:
+- Creating dynamic video presentations with zoom effects
+- Extracting specific segments from long recordings
+- Preparing video content with selective audio muting
+- Applying consistent transformations across multiple video files
+- Building automated video processing pipelines

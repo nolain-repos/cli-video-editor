@@ -14,65 +14,53 @@ The `run.py` module provides a terminal-based interactive menu system for contro
 
 ### Input Handling
 - Captures single-key input in raw terminal mode
-- Interprets special keys including:
-  - Arrow keys (up/down) for navigation
-  - Enter for selection
-  - Escape for cancellation
-  - Handles Ctrl+C as a keyboard interrupt
+- Supports special key detection (arrow keys, Enter, Escape, Ctrl+C)
+- Handles terminal state preservation (restores original terminal settings after input)
 
 ### Video Editing Workflow
-- Presents a predefined set of video editing actions:
-  - Zoom
-  - Mute
-  - Spatial Crop
-  - Time Crop
-- Integrates with the `VideoEditor` class for executing selected operations
+- Presents a predefined set of video editing actions (Zoom, Mute, Spatial Crop, Time Crop)
+- Serves as the entry point for the `VideoEditor` class functionality
+- Designed to facilitate user selection of editing operations
 
 ## Key Components
 
-### `read_key()`
-**Purpose**: Low-level keyboard input handler
-**Input**: None (reads directly from stdin)
-**Output**: String representing the key pressed ("up", "down", "enter", "escape", or literal character)
-**Behavior**:
-- Temporarily configures terminal for raw input mode
-- Handles multi-byte sequences for special keys
-- Restores original terminal settings after reading
+### Input Processing
+- **Key Reading Algorithm**: Interprets raw terminal input to detect special keys while maintaining compatibility with standard character input
+- **Terminal State Management**: Temporarily modifies terminal settings for raw input while ensuring proper restoration
 
-### `clear_screen()`
-**Purpose**: Terminal screen management
-**Input**: None
-**Output**: None (direct terminal output)
-**Behavior**:
-- Clears all content from the terminal
-- Resets cursor position to top-left corner
+### Menu System
+- **Navigation Logic**: Tracks currently selected menu option and handles user navigation commands
+- **Visual Feedback**: Highlights the currently selected option using inverted colors
+- **Information Display**: Presents clear navigation instructions and maintains consistent screen layout
 
-### `show_menu()`
-**Purpose**: Interactive menu display and navigation
-**Input**:
-- `title`: Menu header text
-- `options`: List of selectable menu items
-- `header`: Optional text displayed above the title
-**Output**: Integer representing the index of the selected option
-**Behavior**:
-- Renders a formatted menu with visual indicators for the selected item
-- Handles keyboard navigation in a loop until selection is made
-- Provides visual feedback for navigation controls
+## Inputs
 
-## Technical Implementation Details
+### User Input
+- Arrow keys (up/down) for navigation
+- Enter key for selection
+- Escape key for cancellation (where applicable)
+- Standard character input (for future extensibility)
 
-### Terminal Control
-- Uses Unix-specific terminal control modules (`tty`, `termios`)
-- Implements proper resource management with try-finally blocks
-- Handles terminal state restoration after operations
+### Programmatic Inputs
+- Menu title string
+- List of option strings
+- Optional header text
 
-### User Experience
-- Provides clear visual hierarchy with formatted text
-- Includes navigation instructions in the interface
-- Uses inverted colors to highlight the currently selected option
-- Maintains consistent spacing and alignment
+## Outputs
 
-### Integration Points
-- Designed to work with the `VideoEditor` class for actual video processing
-- Menu options correspond to specific video editing operations
-- Input handling supports both simple key presses and complex key sequences
+### User Interface Outputs
+- Formatted menu display with:
+  - Title (bold formatting)
+  - List of options (with current selection highlighted)
+  - Navigation instructions (dimmed formatting)
+
+### Programmatic Outputs
+- Integer representing the index of the selected menu option (0-based)
+- Keyboard interrupt signals (propagated for application-level handling)
+
+## Technical Characteristics
+
+- **Terminal Compatibility**: Designed for Unix-like systems with termios support
+- **State Management**: Maintains terminal state integrity through proper resource cleanup
+- **Error Handling**: Propagates keyboard interrupts for graceful application termination
+- **Extensibility**: Modular design allows for additional menu options and actions
