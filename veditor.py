@@ -3,14 +3,17 @@ from PIL import Image
 import numpy as np
 
 class VideoEditor:
-    """
-    A class to manage and apply video editing operations using MoviePy.
+    """A class to manage and apply video editing operations using MoviePy.
+
+    This class provides methods to apply various video editing operations such as zooming,
+    cropping (temporal and spatial), and muting audio segments. The operations are applied
+    in a specific order when the `run` method is called.
 
     Order of operations applied in run():
-    1. Apply all zoom transformations to the original video.
-    2. Apply spatial crop (frame region).
-    3. Apply mute ranges to the audio track.
-    4. Extract and concatenate specific temporal segments (time crops).
+        1. Apply all zoom transformations to the original video.
+        2. Apply spatial crop (frame region).
+        3. Apply mute ranges to the audio track.
+        4. Extract and concatenate specific temporal segments (time crops).
     """
 
     def __init__(self):
@@ -18,19 +21,21 @@ class VideoEditor:
         self.zooms = []
         self.crops = []
         self.spatial_crop = None
+        self.spatial_crop_normalized = False
         self.mutes = []
 
     def add_zoom(self, tstart, tend, w, h, zoom_factor):
-        """
-        Adds a gradual zoom operation. The video will zoom in from 1.0 to zoom_factor 
-        and then back to 1.0 during the specified interval.
-        
+        """Adds a gradual zoom operation to the video.
+
+        The video will zoom in from 1.0 to `zoom_factor` and then back to 1.0 during the
+        specified interval. The zoom effect uses a smoothstep function for smooth transitions.
+
         Args:
             tstart (float): The start time (in seconds) for the zoom effect.
             tend (float): The end time (in seconds) for the zoom effect.
             w (float): The relative horizontal center of the zoom (0.0 to 1.0).
             h (float): The relative vertical center of the zoom (0.0 to 1.0).
-            zoom_factor (float): The peak magnification factor at the midpoint.
+            zoom_factor (float): The peak magnification factor at the midpoint of the zoom.
         """
         self.zooms.append({
             'tstart': tstart,
@@ -41,8 +46,10 @@ class VideoEditor:
         })
 
     def add_time_crop(self, tstart, tend):
-        """
-        Adds a temporal cropping operation (segment to keep).
+        """Adds a temporal cropping operation (segment to keep).
+
+        This operation specifies a segment of the video to retain. Multiple segments can be
+        added and they will be concatenated in the final output.
 
         Args:
             tstart (float): The start time (in seconds) of the segment to keep.
@@ -50,24 +57,27 @@ class VideoEditor:
         """
         self.crops.append((tstart, tend))
 
-    def add_spatial_crop(self, x1, y1, x2, y2):
-        """
-        Crops the video frame to the given pixel rectangle. Subsequent calls
-        override the previous one (only one spatial crop is applied).
+    def add_spatial_crop(self, x1, y1, x2, y2, normalized=False):
+        """Sets a spatial crop for the video frame.
+
+        Crops the video frame to the given rectangle. Subsequent calls override the
+        previous spatial crop (only one spatial crop is applied).
 
         Args:
-            x1 (int): Left boundary in pixels.
-            y1 (int): Top boundary in pixels.
-            x2 (int): Right boundary in pixels.
-            y2 (int): Bottom boundary in pixels.
+            x1 (int or float): Left boundary (pixels if normalized=False, else 0–1).
+            y1 (int or float): Top boundary (pixels if normalized=False, else 0–1).
+            x2 (int or float): Right boundary (pixels if normalized=False, else 0–1).
+            y2 (int or float): Bottom boundary (pixels if normalized=False, else 0–1).
+            normalized (bool, optional): If True, x1, y1, x2, y2 are in 0–1. Defaults to False.
         """
         self.spatial_crop = (x1, y1, x2, y2)
+        self.spatial_crop_normalized = normalized
 
     def add_mute(self, tstart=None, tend=None):
-        """
-        Mutes the audio for a time range. Times refer to the original video
-        timeline (before time crops). Calling with no arguments mutes the
-        entire video.
+        """Adds a mute range to the video's audio track.
+
+        Mutes the audio for a specified time range. Times refer to the original video
+        timeline (before time crops). Calling with no arguments mutes the entire video.
 
         Args:
             tstart (float, optional): Start time in seconds. Defaults to 0.
@@ -78,15 +88,14 @@ class VideoEditor:
     def _apply_mutes(self, video):
         """Applies all queued mute ranges to the video's audio track.
 
-        Merges overlapping mute ranges and builds a new audio clip from
-        silent and original segments.
+        Merges overlapping mute ranges and builds a new audio clip from silent and original
+        segments. If the entire duration is muted, the video is returned without audio.
 
         Args:
-            video (VideoClip): The video clip whose audio will be muted.
+            video (VideoFileClip): The video clip whose audio will be muted.
 
         Returns:
-            VideoClip: The same video with audio muted in the specified ranges.
-                If the entire duration is muted, returns video without audio.
+            VideoFileClip: The same video with audio muted in the specified ranges.
         """
         audio = video.audio
         if audio is None:
@@ -146,7 +155,8 @@ class VideoEditor:
     def run(self, input_path, output_path):
         """Processes the input video by applying all queued operations and writes the result.
 
-        Order of operations: zooms, spatial crop, mutes, time crops, then export.
+        The operations are applied in the following order: zooms, spatial crop, mutes,
+        and time crops. The processed video is then exported to the specified output path.
 
         Args:
             input_path (str): Path to the source video file.
@@ -154,27 +164,27 @@ class VideoEditor:
         """
         video = VideoFileClip(input_path)
         original_w, original_h = video.size
-        
+
         # 1. Apply Zooms
         # We split the video into segments based on zoom times.
         zoom_times = []
         for z in self.zooms:
             zoom_times.extend([z['tstart'], z['tend']])
-        
+
         zoom_times.extend([0, video.duration])
         zoom_times = sorted(list(set(zoom_times)))
-        
+
         segments = []
         for i in range(len(zoom_times) - 1):
             t1, t2 = zoom_times[i], zoom_times[i+1]
             if t1 >= t2: continue
-            
+
             seg = video.subclipped(t1, t2)
-            
+
             # Check if this segment has an active zoom
             mid_abs = (t1 + t2) / 2
             active_zoom = next((z for z in self.zooms if z['tstart'] <= mid_abs <= z['tend']), None)
-            
+
             if active_zoom:
                 z_start = active_zoom['tstart']
                 z_end = active_zoom['tend']
@@ -185,14 +195,27 @@ class VideoEditor:
                 midpoint = duration / 2
 
                 def gradual_zoom_filter(get_frame, t, t1=t1, z_start=z_start, duration=duration, z_peak_factor=z_peak_factor, z_w=z_w, z_h=z_h):
+                    """Applies a gradual zoom effect to a video frame.
+
+                    This function is used as a transform filter for MoviePy. It calculates the
+                    current zoom factor based on the time within the zoom effect and applies
+                    the zoom to the frame.
+
+                    Args:
+                        get_frame (callable): A function that returns the frame at time t.
+                        t (float): The time within the current segment.
+
+                    Returns:
+                        numpy.ndarray: The processed frame with zoom applied.
+                    """
                     # t is relative to the segment start
                     t_abs = t1 + t
                     t_rel_zoom = t_abs - z_start
-                    
+
                     # Define phases: 30% ramp up, 40% plateau, 30% ramp down
                     ramp_up_end = duration * 0.3
                     plateau_end = duration * 0.7
-                    
+
                     if t_rel_zoom <= ramp_up_end:
                         # Phase 1: Ramp Up (Smoothstep)
                         progress = t_rel_zoom / ramp_up_end
@@ -208,46 +231,50 @@ class VideoEditor:
                         # Inverse smoothstep
                         smooth_progress = 3 * (progress**2) - 2 * (progress**3)
                         current_factor = z_peak_factor - (z_peak_factor - 1.0) * smooth_progress
-                    
+
                     current_factor = max(1.0, current_factor)
-                    
+
                     # Get the original frame
                     frame = get_frame(t)
-                    
+
                     if current_factor <= 1.0:
                         return frame
 
                     # Process frame with PIL
                     img = Image.fromarray(frame)
-                    
+
                     # 1. Resize
                     new_w = int(original_w * current_factor)
                     new_h = int(original_h * current_factor)
-                    
+
                     # Use a more compatible way to get the resampling filter
                     resample_filter = getattr(Image, 'Resampling', Image).LANCZOS
                     img = img.resize((new_w, new_h), resample_filter)
-                    
+
                     # 2. Calculate Crop Box to keep target centered
                     target_x_px = original_w * z_w * current_factor
                     target_y_px = original_h * z_h * current_factor
-                    
+
                     x1 = max(0, min(target_x_px - (original_w / 2), new_w - original_w))
                     y1 = max(0, min(target_y_px - (original_h / 2), new_h - original_h))
-                    
+
                     img = img.crop((x1, y1, x1 + original_w, y1 + original_h))
-                    
+
                     return np.array(img)
 
                 seg = seg.transform(gradual_zoom_filter)
-            
+
             segments.append(seg)
-        
+
         zoomed_video = concatenate_videoclips(segments)
 
         # 2. Apply Spatial Crop
         if self.spatial_crop:
             x1, y1, x2, y2 = self.spatial_crop
+            if self.spatial_crop_normalized:
+                w, h = zoomed_video.size
+                x1, y1 = int(x1 * w), int(y1 * h)
+                x2, y2 = int(x2 * w), int(y2 * h)
             zoomed_video = zoomed_video.with_effects([vfx.Crop(x1=x1, y1=y1, x2=x2, y2=y2)])
 
         # 3. Apply Mutes

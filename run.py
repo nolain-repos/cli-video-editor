@@ -305,13 +305,25 @@ def configure_mute():
 
 
 def configure_spatial_crop():
-    """Prompts for pixel boundaries and returns the spatial crop action.
+    """Prompts for crop boundaries in pixels or normalized (0–1) and returns the spatial crop action.
 
     Returns:
-        tuple: ("spatial_crop", {"x1", "y1", "x2", "y2"}).
+        tuple: ("spatial_crop", {"x1", "y1", "x2", "y2", "normalized"?}).
     """
     clear_screen()
     print("  \033[1mConfigure Spatial Crop\033[0m\n")
+    print("  Enter values as:  \033[2mp\033[0m pixels  or  \033[2mn\033[0m normalized (0–1)\n")
+    unit = get_input("  Unit (p/n): ", type_fn=lambda s: s.strip().lower(), optional=False)
+    while unit not in ("p", "n", "pixels", "normalized"):
+        print("  Enter  \033[2mp\033[0m  or  \033[2mn\033[0m")
+        unit = get_input("  Unit (p/n): ", type_fn=lambda s: s.strip().lower(), optional=False)
+    use_normalized = unit in ("n", "normalized")
+    if use_normalized:
+        x1 = get_input("  Left boundary (0–1): ", float)
+        y1 = get_input("  Top boundary (0–1): ", float)
+        x2 = get_input("  Right boundary (0–1): ", float)
+        y2 = get_input("  Bottom boundary (0–1): ", float)
+        return ("spatial_crop", {"x1": x1, "y1": y1, "x2": x2, "y2": y2, "normalized": True})
     x1 = get_input("  Left boundary (px): ", int)
     y1 = get_input("  Top boundary (px): ", int)
     x2 = get_input("  Right boundary (px): ", int)
